@@ -138,7 +138,7 @@ def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
         n_components (int): Number of principal components to keep.
 
     Returns:
-        np.ndarray: The PCA-reduced feature vectors with shape (num_samples, n_components).
+        reduced_fvectors (np.ndarray): The PCA-reduced feature vectors with shape (num_samples, n_components).
     """
     epsilon = 1e-8
 
