@@ -15,19 +15,42 @@ import pandas as pd
 import ccxt
 import time
 import matplotlib.pyplot as plt
-from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from scipy.linalg import eigh
+#make this a class that we can call for a list of symbols 
+class CryptoData: 
+    
+    def __init__(self, symbol, timeframe='1h', candles=1000, window=500):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.candles = candles
+        self.window = window
+        self.df = None  
+        self.feature = {} # here we are making a dictionary for all the features we want to use on the PCA matrix
+    # here we are defining a function that just collects the data of the closes for our selected symbols
+    def fetchdata(self): 
+        try:
+            ohlcv = exchange.fetch_ohlcv(self.symbol, timeframe=self.timeframe, limit=self.candles)
+            df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df.set_index('timestamp', inplace=True)
+            self.df = df
+        except Exception as e:
+            print(f"Failed to fetch {self.symbol}: {e}")
+            self.df = None
+    def closeprices(self):
+        return self.df['close']
+    #returns between each hourly candle 
+    def log_hourly_returns(self):
+        self.df['Log Hourly Returns'] = np.log(self.df['close']) - np.log(self.df['close'].shift(1))
+        return self.df['Log Hourly Returns'].dropna()
+    def mean_hourly_function(self):
+        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean() #this gets the mean hourly function so calculates an average return over last 500 candles for example
+        return self.df['Mean Hourly Returns'].dropna()
+    def volatility_returns(self):
+        self.df['Volatility'] = self.df['Log Hourly Returns'].rolling(window=self.window).std()
+        return self.df['Volatility'].dropna()
 
-# Here we are defining a function that just collects the data of the closes for our selected symbols
-def close_prices(symbol, candles=1000, timeframe='15m'):  # 'days=365' put this in if I want to change to days
-    try:
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=candles)
-        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        return df.set_index('timestamp')['close']
-    except Exception as e:
-        print(f"Failed to fetch {symbol}: {e}")
-        return None
+
 
 def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
     """
@@ -62,3 +85,5 @@ def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
 
     return reduced_fvectors
 
+exchange = ccxt.binance()
+markets = exchange.load_markets()
