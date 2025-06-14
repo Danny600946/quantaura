@@ -19,7 +19,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from scipy.linalg import eigh
 
 # Here we are defining a function that just collects the data of the closes for our selected symbols
-def close_prices(symbol, candles=1000, timeframe='15m'):  # 'days=365' put this in if I want to change to days
+def close_prices(symbol, candles=1000, timeframe='1h'):  # 'days=365' put this in if I want to change to days
     try:
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=candles)
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -29,17 +29,9 @@ def close_prices(symbol, candles=1000, timeframe='15m'):  # 'days=365' put this 
         print(f"Failed to fetch {symbol}: {e}")
         return None
 
-<<<<<<< HEAD
-=======
-#Here we are going to define the r value function to help
-def pearson(price1, price2):
-    if price1 is None or price2 is None:
-        return None
-    log_price1 = np.log(price1)
-    log_price2 = np.log(price2)
-    df = pd.concat([log_price1, log_price2], axis=1).dropna()
-    r = df.iloc[:, 0].corr(df.iloc[:, 1])
-    return r
+def mean_log_returns(close)
+    df['Log Hourly Return'] = np.log(df['close'])/np.log(df['close'].shift(1))
+    
 
 # Define the function to calculate the spread from the log prices
 def spread(price1, price2):
@@ -218,5 +210,4 @@ plt.show()
 
 top_pairs = results_df.head(4)['Pair']
 plot_multiple_cointegrated_spreads(top_pairs, all_prices)
->>>>>>> ea998225400d8b79f3efd0c51a467ac9cb513e7f
 
