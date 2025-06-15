@@ -55,6 +55,24 @@ class CryptoData:
     def volatility_returns(self):
         self.df['Volatility'] = self.df['Log Hourly Returns'].rolling(window=self.window).std()
         return self.df['Volatility'].dropna()
+    def skewness(self): # this is the method defining skewness using the typical formula skewness = 1/n * Σ [ ((x_i - mean) / std) ** 3 ]
+        prices = self.log_hourly_returns().values
+        mean = np.mean(prices)
+        std = np.std(prices)
+        skew = np.sum(((prices - mean) / std) ** 3) / len(prices)
+        return skew # should return 1 value for each coing
+    def autocorrelation(self): # defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
+        lag = 1 #we have to define a lag period, we can test different values for this 
+        prices = self.log_hourly_returns()
+        prices = prices.dropna()
+        laggedprices = prices.shift(lag).dropna() 
+        prices, laggedprices = prices.align(laggedprices, join='inner') # making these two variables aligned in the table
+        
+        mean = np.mean(prices)
+        autocorrelation =  np.sum((prices - mean) * (laggedprices- mean)) /np.sum((prices - mean) ** 2)
+        return autocorrelation
+
+    
 
 
 
