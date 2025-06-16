@@ -18,19 +18,63 @@ import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
 from statsmodels.tsa.stattools import adfuller
-#make this a class that we can call for a list of symbols 
+
 class CryptoData: 
+    """
+    Handles cryptocurrency data acquisition, preprocessing, and feature extraction for asset universe analysis.
+
+    Purpose:
+        This class serves as the core handler for preparing cryptocurrency market data for further
+        analysis such as clustering, PCA-based dimensionality reduction, and portfolio filtering.
+
+    Key Responsibilities:
+        - Asset-level OHLCV data downloading via ccxt (e.g., Binance).
+        - Calculation of key statistical features: log returns, volatility, skewness, autocorrelation, etc.
+        - Data standardization and rolling window smoothing.
+        - Stationarity testing using the Augmented Dickey-Fuller test.
+        - Structuring feature vectors for PCA and clustering pipelines.
+        - Supporting asset selection workflows based on volume, volatility, and return behavior.
+
+    Attributes:
+        symbol (str): The trading pair symbol (e.g., 'BTC/USDT').
+        timeframe (str): The time interval for each OHLCV candle (default is '1h').
+        candles (int): The number of past candlesticks to fetch (default is 1000).
+        window (int): The rolling window size used for feature calculations (default is 500).
+        df (pd.DataFrame or None): DataFrame storing the raw and derived historical market data.
+        feature (dict): Dictionary for storing computed feature values to be used in PCA or clustering.
+    """
     
     def __init__(self, symbol, timeframe='1h', candles=1000, window=500):
+        """
+        Initialize the CryptoData object with symbol, timeframe, candle count, and window size.
+
+        Args:
+            symbol (str): The trading symbol to fetch data for (e.g., 'BTC/USDT').
+            timeframe (str, optional): Timeframe for each candlestick (default is '1h').
+            candles (int, optional): Number of historical candles to retrieve (default is 1000).
+            window (int, optional): Window size for rolling feature calculations (default is 500).
+        """
         self.symbol = symbol
         self.timeframe = timeframe
         self.candles = candles
         self.window = window
         self.df = None  
-        self.feature = {} # here we are making a dictionary for all the features we want to use on the PCA matrix
+        self.feature = {}
 
-    # here we are defining a function that just collects the data of the closes for our selected symbols
+   
     def fetchdata(self): 
+        """
+        Fetch historical OHLCV data for the selected symbol and store it as a DataFrame.
+
+        This function retrieves candlestick data (Open, High, Low, Close, Volume) using the configured
+        exchange, symbol, timeframe, and number of candles. It converts timestamps to datetime format
+        and stores the result in `self.df`.
+
+        On failure, it prints an error message and sets `self.df` to None.
+
+        Returns:
+            None
+        """
         try:
             ohlcv = exchange.fetch_ohlcv(self.symbol, timeframe=self.timeframe, limit=self.candles)
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -42,45 +86,112 @@ class CryptoData:
             self.df = None
 
     def closeprices(self):
+        """
+        Retrieve the close prices from the dataset.
+
+        Returns:
+            pd.Series: A series containing the 'close' prices.
+        """
         return self.df['close']
     
-    #returns between each hourly candle 
+    
     def log_hourly_returns(self):
+        """
+        Calculate log returns between each hourly candle.
+
+        This function computes the natural logarithmic returns from the 'close' prices to capture
+        relative price changes between consecutive hourly intervals.
+
+        Returns:
+            pd.Series: A series of log hourly returns, with NaNs dropped.
+        """
         self.df['Log Hourly Returns'] = np.log(self.df['close']) - np.log(self.df['close'].shift(1))
         return self.df['Log Hourly Returns'].dropna()
     
     def mean_hourly_function(self):
-        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean() #this gets the mean hourly function so calculates an average return over last 500 candles for example
+        """
+        Compute the rolling mean of log hourly returns.
+
+        This function calculates the rolling average of log hourly returns over a specified window,
+        providing a smoothed view of recent average returns (e.g., over the last 500 time intervals).
+
+        Returns:
+            pd.Series: A series of rolling mean values for hourly returns, with NaNs dropped.
+        """
+        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean()
         return self.df['Mean Hourly Returns'].dropna()
     
     def volatility_returns(self):
+        """
+        Compute the rolling volatility (standard deviation) of log hourly returns.
+
+        This function calculates the rolling standard deviation over a specified window to measure return variability,
+        representing the volatility of the asset over time.
+
+        Returns:
+            pd.Series: A series of rolling volatility values, with NaNs dropped.
+        """
         self.df['Volatility'] = self.df['Log Hourly Returns'].rolling(window=self.window).std()
         return self.df['Volatility'].dropna()
     
-    def skewness(self): # this is the method defining skewness using the typical formula skewness = 1/n * Σ [ ((x_i - mean) / std) ** 3 ]
+    def skewness(self):
+        """
+        Calculate the skewness of log hourly returns.
+
+        Skewness measures the asymmetry of the return distribution. Positive skew indicates a longer right tail,
+        while negative skew indicates a longer left tail. The formula used is:
+            skewness = (1/n) * Σ [ ((x_i - mean) / std) ** 3 ]
+
+        Returns:
+            skew (float): The skewness value of the return distribution.
+        """
         prices = self.log_hourly_returns().values
         mean = np.mean(prices)
         std = np.std(prices)
         skew = np.sum(((prices - mean) / std) ** 3) / len(prices)
-        return skew # should return 1 value for each coing
+        # Return 1 value for each coing.
+        return skew 
     
-    def autocorrelation(self): # defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
-        lag = 1 #we have to define a lag period, we can test different values for this 
+    def autocorrelation(self): 
+        """
+        Compute the lag-1 autocorrelation of log hourly returns.
+
+        This function measures the linear relationship between current and lagged returns, providing insight
+        into momentum or mean-reverting behavior in the time series. Autocorrelation values range from:
+            -1: strong negative correlation (likely reversal),
+            0: no correlation (uncertainty),
+            1: strong positive correlation (momentum).
+
+        Returns:
+            autocorrelation (float): The autocorrelation coefficient at lag 1.
+        """
+        # Lag period, we can test different values for this 
+        lag = 1
         returns = self.log_hourly_returns()
         prices = returns.dropna()
         laggedprices = prices.shift(lag).dropna() 
-        prices, laggedprices = prices.align(laggedprices, join='inner') # making these two variables aligned in the table
+        # Aligns the two variables in the table.
+        prices, laggedprices = prices.align(laggedprices, join='inner') 
         
         mean = np.mean(prices)
         autocorrelation =  np.sum((prices - mean) * (laggedprices- mean)) /np.sum((prices - mean) ** 2)
         return autocorrelation
     
-    #this is for the augmented dickey-fuller test
     def adftest(self):
+        """
+        Perform the Augmented Dickey-Fuller (ADF) test to check for stationarity in log hourly returns.
+
+        This function calculates log hourly returns, applies the ADF test to determine if the time series
+        is stationary, and returns a binary indicator based on the p-value.
+
+        Returns:
+            stationaryflag (int): 1 if the time series is stationary (p < 0.05), otherwise 0.
+        """
         returns = self.log_hourly_returns()
         results = adfuller(returns)
-        #in order to normalise this before plugging it in the pca test we can try using a binary stationarity to help normalise
-        stationaryflag = int(results[1] < 0.05) # this checks to see if p values are below the hypothesis test level. 
+        # Normalise this before using pca test, try a binary stationarity to help normalise.
+        # Checks p values are below the hypothesis test level. 
+        stationaryflag = int(results[1] < 0.05) 
         return stationaryflag
     
     def Arch_P_Test(self):
