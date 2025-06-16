@@ -17,6 +17,7 @@ import time
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
+from statsmodels.tsa.stattools import adfuller
 #make this a class that we can call for a list of symbols 
 class CryptoData: 
     
@@ -65,14 +66,28 @@ class CryptoData:
     
     def autocorrelation(self): # defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
         lag = 1 #we have to define a lag period, we can test different values for this 
-        prices = self.log_hourly_returns()
-        prices = prices.dropna()
+        returns = self.log_hourly_returns()
+        prices = returns.dropna()
         laggedprices = prices.shift(lag).dropna() 
         prices, laggedprices = prices.align(laggedprices, join='inner') # making these two variables aligned in the table
         
         mean = np.mean(prices)
         autocorrelation =  np.sum((prices - mean) * (laggedprices- mean)) /np.sum((prices - mean) ** 2)
         return autocorrelation
+    
+    #this is for the augmented dickey-fuller test
+    def adftest(self):
+        returns = self.log_hourly_returns()
+        results = adfuller(returns)
+        #in order to normalise this before plugging it in the pca test we can try using a binary stationarity to help normalise
+        stationaryflag = int(results[1] < 0.05) # this checks to see if p values are below the hypothesis test level. 
+        return stationaryflag
+    
+    def Arch_P_Test(self):
+        returns = self.log_hourly_returns()
+        garchtest = arch_model(returns, vol = 'Garch', p = 1 , q = 1, mean = 'Zero') # defining parameters for the garch test 
+        
+    
 
     def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
         """
