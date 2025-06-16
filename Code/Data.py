@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
 from statsmodels.tsa.stattools import adfuller
+from arch import arch_model
 
 class CryptoData: 
     """
@@ -197,7 +198,30 @@ class CryptoData:
     def Arch_P_Test(self):
         returns = self.log_hourly_returns()
         garchtest = arch_model(returns, vol = 'Garch', p = 1 , q = 1, mean = 'Zero') # defining parameters for the garch test 
-        
+        garch = garchtest.fit(disp = 'off')
+        results = garch.params # this is to quantitatively define the parameters for the garch test
+        return results['alpha[1]'] + results['beta[1]'] # if these sum close to one then this means we have strong persistence, if not then bad volatility clustering
+    
+    def average_hourly_volume(self):
+        volume = self.df['volume'].dropna()
+        return volume.mean() # the mean is just the hourly average volume 1/n * sum of volume 
+    
+    def volume_volatility(self): # this literally just calculates the volume volatility as a function of the lookback period (the standard deviation)
+        volume = self.df['volume'].rolling(window=self.window).std()
+        return volume.dropna()
+
+    def max_drawdown(self): #this needs to be a for loop because we always gotta adjust from peak to trough
+        prices = self.df['close']
+        max_price = prices.iloc[0] #this basically just makes max_price start at the very first digit in the prices dataframe
+        max_drawdown = 0  
+        for price in prices:
+            if price > max_price:
+                max_price = price
+            drawdown = max_price - price
+            if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+        return max_drawdown
+
     
 
     def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
