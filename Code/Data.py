@@ -209,18 +209,13 @@ class CryptoData:
     def volume_volatility(self): # this literally just calculates the volume volatility as a function of the lookback period (the standard deviation)
         volume = self.df['volume'].rolling(window=self.window).std()
         return volume.dropna()
+    
+    def max_drawdown(self):
+        prices = self.df['close'].values
+        running_max = np.maximum.accumulate(prices)
+        drawdowns = running_max - prices
+        return np.max(drawdowns)
 
-    def max_drawdown(self): #this needs to be a for loop because we always gotta adjust from peak to trough
-        prices = self.df['close']
-        max_price = prices.iloc[0] #this basically just makes max_price start at the very first digit in the prices dataframe
-        max_drawdown = 0  
-        for price in prices:
-            if price > max_price:
-                max_price = price
-            drawdown = max_price - price
-            if drawdown > max_drawdown:
-                    max_drawdown = drawdown
-        return max_drawdown
 
     
 
