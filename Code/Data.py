@@ -109,19 +109,6 @@ class CryptoData:
         self.df['Log Hourly Returns'] = np.log(self.df['close']) - np.log(self.df['close'].shift(1))
         return self.df['Log Hourly Returns'].dropna()
     
-    def mean_hourly_function(self):
-        """
-        Compute the rolling mean of log hourly returns.
-
-        This function calculates the rolling average of log hourly returns over a specified window,
-        providing a smoothed view of recent average returns (e.g., over the last 500 time intervals).
-
-        Returns:
-            pd.Series: A series of rolling mean values for hourly returns, with NaNs dropped.
-        """
-        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean()
-        return self.df['Mean Hourly Returns'].dropna()
-    
     def volatility_returns(self):
         """
         Compute the rolling volatility (standard deviation) of log hourly returns.
@@ -134,49 +121,6 @@ class CryptoData:
         """
         self.df['Volatility'] = self.df['Log Hourly Returns'].rolling(window=self.window).std()
         return self.df['Volatility'].dropna()
-    
-    def skewness(self):
-        """
-        Calculate the skewness of log hourly returns.
-
-        Skewness measures the asymmetry of the return distribution. Positive skew indicates a longer right tail,
-        while negative skew indicates a longer left tail. The formula used is:
-            skewness = (1/n) * Σ [ ((x_i - mean) / std) ** 3 ]
-
-        Returns:
-            skew (float): The skewness value of the return distribution.
-        """
-        prices = self.log_hourly_returns().values
-        mean = np.mean(prices)
-        std = np.std(prices)
-        skew = np.sum(((prices - mean) / std) ** 3) / len(prices)
-        # Return 1 value for each coing.
-        return skew 
-    
-    def autocorrelation(self): 
-        """
-        Compute the lag-1 autocorrelation of log hourly returns.
-
-        This function measures the linear relationship between current and lagged returns, providing insight
-        into momentum or mean-reverting behavior in the time series. Autocorrelation values range from:
-            -1: strong negative correlation (likely reversal),
-            0: no correlation (uncertainty),
-            1: strong positive correlation (momentum).
-
-        Returns:
-            autocorrelation (float): The autocorrelation coefficient at lag 1.
-        """
-        # Lag period, we can test different values for this 
-        lag = 1
-        returns = self.log_hourly_returns()
-        prices = returns.dropna()
-        laggedprices = prices.shift(lag).dropna() 
-        # Aligns the two variables in the table.
-        prices, laggedprices = prices.align(laggedprices, join='inner') 
-        
-        mean = np.mean(prices)
-        autocorrelation =  np.sum((prices - mean) * (laggedprices- mean)) /np.sum((prices - mean) ** 2)
-        return autocorrelation
     
     def adftest(self):
         """
@@ -209,15 +153,6 @@ class CryptoData:
     def volume_volatility(self): # this literally just calculates the volume volatility as a function of the lookback period (the standard deviation)
         volume = self.df['volume'].rolling(window=self.window).std()
         return volume.dropna()
-    
-    def max_drawdown(self):
-        prices = self.df['close'].values
-        running_max = np.maximum.accumulate(prices)
-        drawdowns = running_max - prices
-        return np.max(drawdowns)
-
-
-    
 
 def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
     """
