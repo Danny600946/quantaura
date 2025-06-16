@@ -17,7 +17,7 @@ import time
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
-#make this a class that we can call for a list of symbols 
+# Make this a class that we can call for a list of symbols 
 class CryptoData: 
     
     def __init__(self, symbol, timeframe='1h', candles=1000, window=500):
@@ -26,9 +26,10 @@ class CryptoData:
         self.candles = candles
         self.window = window
         self.df = None  
-        self.feature = {} # here we are making a dictionary for all the features we want to use on the PCA matrix
+        # Here we are making a dictionary for all the features we want to use on the PCA matrix
+        self.feature = {} 
 
-    # here we are defining a function that just collects the data of the closes for our selected symbols
+    # Here we are defining a function that just collects the data of the closes for our selected symbols
     def fetchdata(self): 
         try:
             ohlcv = exchange.fetch_ohlcv(self.symbol, timeframe=self.timeframe, limit=self.candles)
@@ -43,28 +44,30 @@ class CryptoData:
     def closeprices(self):
         return self.df['close']
     
-    #returns between each hourly candle 
+    # Returns between each hourly candle 
     def log_hourly_returns(self):
         self.df['Log Hourly Returns'] = np.log(self.df['close']) - np.log(self.df['close'].shift(1))
         return self.df['Log Hourly Returns'].dropna()
     
     def mean_hourly_function(self):
-        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean() #this gets the mean hourly function so calculates an average return over last 500 candles for example
+        # This gets the mean hourly function so calculates an average return over last 500 candles for example
+        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean() 
         return self.df['Mean Hourly Returns'].dropna()
     
     def volatility_returns(self):
         self.df['Volatility'] = self.df['Log Hourly Returns'].rolling(window=self.window).std()
         return self.df['Volatility'].dropna()
-    
-    def skewness(self): # this is the method defining skewness using the typical formula skewness = 1/n * Σ [ ((x_i - mean) / std) ** 3 ]
+    # This is the method defining skewness using the typical formula skewness = 1/n * Σ [ ((x_i - mean) / std) ** 3 ] 
+    def skewness(self): 
         prices = self.log_hourly_returns().values
         mean = np.mean(prices)
         std = np.std(prices)
         skew = np.sum(((prices - mean) / std) ** 3) / len(prices)
         return skew # should return 1 value for each coing
-    
-    def autocorrelation(self): # defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
-        lag = 1 #we have to define a lag period, we can test different values for this 
+    # Defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
+    def autocorrelation(self): 
+        # We have to define a lag period, we can test different values for this
+        lag = 1 
         prices = self.log_hourly_returns()
         prices = prices.dropna()
         laggedprices = prices.shift(lag).dropna() 
