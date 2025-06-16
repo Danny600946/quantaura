@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
 from statsmodels.tsa.stattools import adfuller
+from arch import arch_model
 
 class CryptoData: 
     """
@@ -200,86 +201,131 @@ class CryptoData:
         
     
 
-    def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
-        """
-        Reduce the dimensionality of input feature vectors using Principal Component Analysis (PCA).
+def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
+    """
+    Reduce the dimensionality of input feature vectors using Principal Component Analysis (PCA).
 
-        This function standardizes the input data, computes the covariance matrix, performs eigenvalue
-        decomposition, and projects the data onto the top principal components.
+    This function standardizes the input data, computes the covariance matrix, performs eigenvalue
+    decomposition, and projects the data onto the top principal components.
 
-        Args:
-            fvectors (np.ndarray): 2D array of feature vectors.
-            n_components (int): Number of principal components to keep.
+    Args:
+        fvectors (np.ndarray): 2D array of feature vectors.
+        n_components (int): Number of principal components to keep.
 
-        Returns:
-            reduced_fvectors (np.ndarray): The PCA-reduced feature vectors with shape (num_samples, n_components).
-        """
-        epsilon = 1e-8
+    Returns:
+        reduced_fvectors (np.ndarray): The PCA-reduced feature vectors with shape (num_samples, n_components).
+    """
+    epsilon = 1e-8
 
-        # Normalize the data
-        mean = np.mean(fvectors, axis=0)
-        std = np.std(fvectors, axis=0)
-        normalized_fvectors = (fvectors - mean) / (std + epsilon)
+    # Normalize the data
+    mean = np.mean(fvectors, axis=0)
+    std = np.std(fvectors, axis=0)
+    normalized_fvectors = (fvectors - mean) / (std + epsilon)
 
-        # Compute covariance matrix
-        cov_matrix = np.cov(normalized_fvectors, rowvar=False)
+    # Compute covariance matrix
+    cov_matrix = np.cov(normalized_fvectors, rowvar=False)
 
-        eig_val, eig_vec = eigh(cov_matrix)
-        # Sort by descending eigenvalues
-        eig_vec = eig_vec[:, np.argsort(eig_val)[::-1]] 
+    eig_val, eig_vec = eigh(cov_matrix)
+    # Sort by descending eigenvalues
+    eig_vec = eig_vec[:, np.argsort(eig_val)[::-1]] 
 
-        # Project to reduced dimensions
-        reduced_fvectors = np.dot(normalized_fvectors, eig_vec[:, :n_components])
+    # Project to reduced dimensions
+    reduced_fvectors = np.dot(normalized_fvectors, eig_vec[:, :n_components])
 
-        return reduced_fvectors
+    return reduced_fvectors
 
-    def k_means_cluster(number_of_clusters: int, max_iterations: int, reduced_fvectors: np.ndarray, tolerance=1e-4):
-        """
-        Perform K-means clustering on a set of feature vectors.
+def k_means_cluster(number_of_clusters: int, max_iterations: int, reduced_fvectors: np.ndarray, tolerance=1e-4):
+    """
+    Perform K-means clustering on a set of feature vectors.
 
-        This function partitions the input feature vectors into a specified number of clusters by
-        iteratively assigning points to the nearest centroid and updating centroids based on the 
-        mean of assigned points. The algorithm stops when centroids converge (change less than a 
-        given tolerance) or the maximum number of iterations is reached.
+    This function partitions the input feature vectors into a specified number of clusters by
+    iteratively assigning points to the nearest centroid and updating centroids based on the 
+    mean of assigned points. The algorithm stops when centroids converge (change less than a 
+    given tolerance) or the maximum number of iterations is reached.
 
-        Args:
-            number_of_clusters (int): The number of clusters to form (K).
-            max_iterations (int): Maximum number of iterations for the algorithm to run.
-            reduced_fvectors (np.ndarray): 2D array of input feature vectors with shape (num_samples, num_features).
-            tolerance (float, optional): Threshold for centroid movement to determine convergence. Defaults to 1e-4.
+    Args:
+        number_of_clusters (int): The number of clusters to form (K).
+        max_iterations (int): Maximum number of iterations for the algorithm to run.
+        reduced_fvectors (np.ndarray): 2D array of input feature vectors with shape (num_samples, num_features).
+        tolerance (float, optional): Threshold for centroid movement to determine convergence. Defaults to 1e-4.
 
-        Returns:
-            assignments (np.ndarray): 1D array of shape (num_samples,) indicating the index of the assigned cluster for each point.
-            centroids (np.ndarray): 2D array of final centroid positions with shape (number_of_clusters, num_features).
-        """
+    Returns:
+        assignments (np.ndarray): 1D array of shape (num_samples,) indicating the index of the assigned cluster for each point.
+        centroids (np.ndarray): 2D array of final centroid positions with shape (number_of_clusters, num_features).
+    """
 
-        # Selects initial centorids from reduced fvectors
-        random_reduce_fvectors = np.random.choice(reduced_fvectors.shape[0], size=number_of_clusters, replace=False)
-        centroids = reduced_fvectors[random_reduce_fvectors]
+    # Selects initial centorids from reduced fvectors
+    random_reduce_fvectors = np.random.choice(reduced_fvectors.shape[0], size=number_of_clusters, replace=False)
+    centroids = reduced_fvectors[random_reduce_fvectors]
 
-        # Loops until convergence of clusters or max iterations
-        for iteration in range(max_iterations):
-            # Calcs distances pairwise (Each point to each centroid)
-            distances = cdist(reduced_fvectors, centroids, metric='euclidean')
-            # Finds the index of smallest distance and stores the cluster number.
-            assignments = np.argmin(distances, axis=1)
+    # Loops until convergence of clusters or max iterations
+    for iteration in range(max_iterations):
+        # Calcs distances pairwise (Each point to each centroid)
+        distances = cdist(reduced_fvectors, centroids, metric='euclidean')
+        # Finds the index of smallest distance and stores the cluster number.
+        assignments = np.argmin(distances, axis=1)
 
-            # Calcs mean for each cluster, assigns value as new centroid.
-            # If a cluster has no points, old centroid value is used. 
-            new_centroids = np.array([
-                reduced_fvectors[assignments == cluster_number].mean(axis=0)
-                if np.any(assignments == cluster_number) else centroids[cluster_number]
-                for cluster_number in range(number_of_clusters)
-            ])
+        # Calcs mean for each cluster, assigns value as new centroid.
+        # If a cluster has no points, old centroid value is used. 
+        new_centroids = np.array([
+            reduced_fvectors[assignments == cluster_number].mean(axis=0)
+            if np.any(assignments == cluster_number) else centroids[cluster_number]
+            for cluster_number in range(number_of_clusters)
+        ])
 
-            # Check for convergence based on threshold value.
-            if np.all(np.linalg.norm(centroids - new_centroids, axis=1) < tolerance):
-                print(f"Converged at iteration {iteration}")
-                break
-            # Updates centroids.
-            centroids = new_centroids
+        # Check for convergence based on threshold value.
+        if np.all(np.linalg.norm(centroids - new_centroids, axis=1) < tolerance):
+            print(f"Converged at iteration {iteration}")
+            break
+        # Updates centroids.
+        centroids = new_centroids
 
-        return assignments, centroids
+    return assignments, centroids
+    
+def feature_vector_builder(self):
+    try:
+        self.log_hourly_returns() 
+        vector = [
+            self.mean_hourly_function().mean(),          
+            self.volatility_returns().mean(),            
+            self.skewness(),                              
+            self.autocorrelation(),                       
+            self.adftest()                                                     
+        ]
+        return np.array(vector)
+        
+    except Exception as e:
+        print(f"Feature extraction failed for {self.symbol}: {e}")
+        # Return NaNs if anything fails
+        return np.full(5, np.nan)  
 
 exchange = ccxt.binance()
 markets = exchange.load_markets()
+# Needs changing to what we want.
+symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ADA/USDT']  
+all_feature_vectors = []
+
+for symbol in symbols:
+    crypto = CryptoData(symbol)
+    crypto.fetchdata()
+    features = feature_vector_builder(crypto)
+    all_feature_vectors.append(features)
+
+fvectors = np.array(all_feature_vectors)
+
+reduced_fvectors = pca_reduce(fvectors, n_components=2)
+assignments, centroids = k_means_cluster(
+    number_of_clusters=2,
+    max_iterations=100,
+    reduced_fvectors=reduced_fvectors
+)
+
+plt.scatter(reduced_fvectors[:, 0], reduced_fvectors[:, 1], c=assignments)
+plt.title("Asset Clustering via PCA + K-Means")
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+plt.show()
+
+
+
+
