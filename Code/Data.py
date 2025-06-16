@@ -17,7 +17,8 @@ import time
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
-# Make this a class that we can call for a list of symbols 
+from statsmodels.tsa.stattools import adfuller
+#make this a class that we can call for a list of symbols 
 class CryptoData: 
     
     def __init__(self, symbol, timeframe='1h', candles=1000, window=500):
@@ -26,10 +27,9 @@ class CryptoData:
         self.candles = candles
         self.window = window
         self.df = None  
-        # Here we are making a dictionary for all the features we want to use on the PCA matrix
-        self.feature = {} 
+        self.feature = {} # here we are making a dictionary for all the features we want to use on the PCA matrix
 
-    # Here we are defining a function that just collects the data of the closes for our selected symbols
+    # here we are defining a function that just collects the data of the closes for our selected symbols
     def fetchdata(self): 
         try:
             ohlcv = exchange.fetch_ohlcv(self.symbol, timeframe=self.timeframe, limit=self.candles)
@@ -44,38 +44,50 @@ class CryptoData:
     def closeprices(self):
         return self.df['close']
     
-    # Returns between each hourly candle 
+    #returns between each hourly candle 
     def log_hourly_returns(self):
         self.df['Log Hourly Returns'] = np.log(self.df['close']) - np.log(self.df['close'].shift(1))
         return self.df['Log Hourly Returns'].dropna()
     
     def mean_hourly_function(self):
-        # This gets the mean hourly function so calculates an average return over last 500 candles for example
-        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean() 
+        self.df['Mean Hourly Returns'] = self.df['Log Hourly Returns'].rolling(window=self.window).mean() #this gets the mean hourly function so calculates an average return over last 500 candles for example
         return self.df['Mean Hourly Returns'].dropna()
     
     def volatility_returns(self):
         self.df['Volatility'] = self.df['Log Hourly Returns'].rolling(window=self.window).std()
         return self.df['Volatility'].dropna()
-    # This is the method defining skewness using the typical formula skewness = 1/n * Σ [ ((x_i - mean) / std) ** 3 ] 
-    def skewness(self): 
+    
+    def skewness(self): # this is the method defining skewness using the typical formula skewness = 1/n * Σ [ ((x_i - mean) / std) ** 3 ]
         prices = self.log_hourly_returns().values
         mean = np.mean(prices)
         std = np.std(prices)
         skew = np.sum(((prices - mean) / std) ** 3) / len(prices)
         return skew # should return 1 value for each coing
-    # Defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
-    def autocorrelation(self): 
-        # We have to define a lag period, we can test different values for this
-        lag = 1 
-        prices = self.log_hourly_returns()
-        prices = prices.dropna()
+    
+    def autocorrelation(self): # defining the autocorrelation function. Autocorrelation gives a value between -1 and 1: -1 means likely reversal, 1 means it’ll keep going, 0 means uncertainty. basically seeing how the returns at time = T differ to returns at time = T - k where k = lag
+        lag = 1 #we have to define a lag period, we can test different values for this 
+        returns = self.log_hourly_returns()
+        prices = returns.dropna()
         laggedprices = prices.shift(lag).dropna() 
         prices, laggedprices = prices.align(laggedprices, join='inner') # making these two variables aligned in the table
         
         mean = np.mean(prices)
         autocorrelation =  np.sum((prices - mean) * (laggedprices- mean)) /np.sum((prices - mean) ** 2)
         return autocorrelation
+    
+    #this is for the augmented dickey-fuller test
+    def adftest(self):
+        returns = self.log_hourly_returns()
+        results = adfuller(returns)
+        #in order to normalise this before plugging it in the pca test we can try using a binary stationarity to help normalise
+        stationaryflag = int(results[1] < 0.05) # this checks to see if p values are below the hypothesis test level. 
+        return stationaryflag
+    
+    def Arch_P_Test(self):
+        returns = self.log_hourly_returns()
+        garchtest = arch_model(returns, vol = 'Garch', p = 1 , q = 1, mean = 'Zero') # defining parameters for the garch test 
+        
+    
 
     def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
         """
