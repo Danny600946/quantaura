@@ -319,7 +319,7 @@ if __name__ == '__main__':
 
     exchange = ccxt.binance()
     markets = exchange.load_markets()
-    #Only getting the symbols with volume
+    # Only getting the symbols with volume
     usdt_markets = {
     symbol: data for symbol, data in markets.items()
     if symbol.endswith('/USDT') and data.get('active') and data.get('quote') == 'USDT'
@@ -332,7 +332,7 @@ if __name__ == '__main__':
     )[:100]
 
     all_feature_vectors = []
-
+    # Construct a feature vector for each symbol.
     for symbol in top_100_symbols:
         crypto = CryptoData(symbol, exchange)
         crypto.fetchdata()
@@ -349,7 +349,7 @@ if __name__ == '__main__':
 
     print(f"Collected {len(fvectors)} valid feature vectors out of {len(all_feature_vectors)}")
 
-    # Then you can continue with PCA and clustering on fvectors
+    # Reduces and clusters.
     reduced_fvectors, loadings = pca_reduce(fvectors, n_components=2)
     assignments, centroids = k_means_cluster(
         number_of_clusters=4,
@@ -374,6 +374,7 @@ if __name__ == '__main__':
         for feature_name, loading in zip(feature_names, loadings[:, i]):
             print(f"  {feature_name}: {loading:.4f}")
 
+    # Plot the clusters (2D)
     plt.scatter(reduced_fvectors[:, 0], reduced_fvectors[:, 1], c=assignments)
     plt.title("Asset Clustering via PCA + K-Means")
     plt.xlabel("PC1")
