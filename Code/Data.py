@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 import ccxt
 import time
+import math
+import requests
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
@@ -45,7 +47,7 @@ class CryptoData:
         feature (dict): Dictionary for storing computed feature values to be used in PCA or clustering.
     """
     
-    def __init__(self, symbol, timeframe='1h', candles=1000, window=500):
+    def __init__(self, symbol, exchange,  timeframe='1h', candles=1000, window=500):
         """
         Initialize the CryptoData object with symbol, timeframe, candle count, and window size.
 
@@ -61,6 +63,7 @@ class CryptoData:
         self.window = window
         self.df = None  
         self.feature = {}
+        self.exchange = exchange
 
    
     def fetchdata(self): 
@@ -77,11 +80,25 @@ class CryptoData:
             None
         """
         try:
-            ohlcv = exchange.fetch_ohlcv(self.symbol, timeframe=self.timeframe, limit=self.candles)
+            ohlcv = self.exchange.fetch_ohlcv(self.symbol, timeframe=self.timeframe, limit=self.candles)
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('timestamp', inplace=True)
             self.df = df
+
+            # Here we are getting the funding rate from the binance api
+            symbol_for_api = self.symbol.replace('/', '')
+            url = f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol_for_api}&limit=1000"
+            resp = requests.get(url)
+            data = resp.json()
+            df_funding = pd.DataFrame(data)
+            df_funding['fundingTime'] = pd.to_datetime(df_funding['fundingTime'], unit='ms')
+            df_funding.set_index('fundingTime', inplace=True)
+            df_funding['fundingRate'] = df_funding['fundingRate'].astype(float)
+
+            # Forward fill funding rates on your OHLCV timestamps
+            self.df['fundingRate'] = df_funding['fundingRate'].reindex(self.df.index, method='ffill')
+
         except Exception as e:
             print(f"Failed to fetch {self.symbol}: {e}")
             self.df = None
@@ -108,6 +125,35 @@ class CryptoData:
         """
         self.df['Log Hourly Returns'] = np.log(self.df['close']) - np.log(self.df['close'].shift(1))
         return self.df['Log Hourly Returns'].dropna()
+    
+    def half_life(self):
+        """
+        Calculate the half-life of mean reversion for the price series in self.df['close'].
+        This performs a regression on the demeaned series:
+            Δy_t = β * y_{t-1} + errorand then calculates half-life as:
+            half_life = -ln(2) / β
+
+        Assumes equal time intervals (e.g., 1 hour, 1 day).
+        """
+        prices = self.df['close'].dropna()
+        # Subtract mean from the series
+        mu = prices.mean()
+        y = prices - mu
+        # Lagged series
+        y_lag = y.shift(1).dropna()
+        y_current = y.loc[y_lag.index]  # align indexes
+        # Differences Δy_t = y_t - y_{t-1}
+        delta_y = y_current - y_lag
+        
+        # Regression β = cov(Δy_t, y_{t-1}) / var(y_{t-1})
+        cov = (delta_y * y_lag).mean() - delta_y.mean() * y_lag.mean()
+        var = ((y_lag - y_lag.mean()) ** 2).mean()
+        beta = cov / var
+        
+        # Calculate half-life
+        halflife = -math.log(2) / beta
+        
+        return halflife
     
     def volatility_returns(self):
         """
@@ -139,7 +185,7 @@ class CryptoData:
         stationaryflag = int(results[1] < 0.05) 
         return stationaryflag
     
-    def Arch_P_Test(self):
+    def Arch_P_Test(self): #VOlatility Persistence
         returns = self.log_hourly_returns()
         garchtest = arch_model(returns, vol = 'Garch', p = 1 , q = 1, mean = 'Zero') # defining parameters for the garch test 
         garch = garchtest.fit(disp = 'off')
@@ -153,6 +199,37 @@ class CryptoData:
     def volume_volatility(self): # this literally just calculates the volume volatility as a function of the lookback period (the standard deviation)
         volume = self.df['volume'].rolling(window=self.window).std()
         return volume.dropna()
+    
+    def feature_vector_builder(self):
+        """
+        Build a feature vector for PCA and clustering from price data.
+
+        Returns:
+            np.ndarray: 1D array of features of fixed length 6.
+        """
+        try:
+            self.log_hourly_returns()
+            vector = [
+                self.half_life(),
+                self.volatility_returns().mean(),
+                self.adftest(),
+                self.Arch_P_Test(),
+                self.average_hourly_volume(),
+                self.volume_volatility().mean()
+            ]
+            vector = np.array(vector, dtype=float)
+
+            # Check length to be safe
+            if len(vector) != 6:
+                raise ValueError("Feature vector has incorrect length")
+
+        except Exception as e:
+            print(f"Feature extraction failed for {self.symbol}: {e}")
+            # Return NaNs if something fails
+            vector = np.full(6, np.nan)
+
+        return vector
+    
 
 def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
     """
@@ -234,50 +311,54 @@ def k_means_cluster(number_of_clusters: int, max_iterations: int, reduced_fvecto
         centroids = new_centroids
 
     return assignments, centroids
-    
-def feature_vector_builder(self):
-    try:
-        self.log_hourly_returns() 
-        vector = [
-            self.mean_hourly_function().mean(),          
-            self.volatility_returns().mean(),            
-            self.skewness(),                              
-            self.autocorrelation(),                       
-            self.adftest()                                                     
-        ]
-        return np.array(vector)
-        
-    except Exception as e:
-        print(f"Feature extraction failed for {self.symbol}: {e}")
-        # Return NaNs if anything fails
-        return np.full(5, np.nan)  
 
-exchange = ccxt.binance()
-markets = exchange.load_markets()
-# Needs changing to what we want.
-symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ADA/USDT']  
-all_feature_vectors = []
+if __name__ == '__main__':
 
-for symbol in symbols:
-    crypto = CryptoData(symbol)
-    crypto.fetchdata()
-    features = feature_vector_builder(crypto)
-    all_feature_vectors.append(features)
+    exchange = ccxt.binance()
+    markets = exchange.load_markets()
+    #Only getting the symbols with volume
+    usdt_markets = {
+    symbol: data for symbol, data in markets.items()
+    if symbol.endswith('/USDT') and data.get('active') and data.get('quote') == 'USDT'
+    }
+    # Sort markets by 24h quote volume (descending) and pick top 100
+    top_100_symbols = sorted(
+        usdt_markets.keys(),
+        key=lambda s: usdt_markets[s].get('info', {}).get('quoteVolume', 0),
+        reverse=True
+    )[:100]
 
-fvectors = np.array(all_feature_vectors)
+    all_feature_vectors = []
 
-reduced_fvectors = pca_reduce(fvectors, n_components=2)
-assignments, centroids = k_means_cluster(
-    number_of_clusters=2,
-    max_iterations=100,
-    reduced_fvectors=reduced_fvectors
-)
+    for symbol in top_100_symbols:
+        crypto = CryptoData(symbol, exchange)
+        crypto.fetchdata()
+        features = crypto.feature_vector_builder()
+        all_feature_vectors.append(features)
 
-plt.scatter(reduced_fvectors[:, 0], reduced_fvectors[:, 1], c=assignments)
-plt.title("Asset Clustering via PCA + K-Means")
-plt.xlabel("PC1")
-plt.ylabel("PC2")
-plt.show()
+    # Filter out any feature vectors that contain NaNs or are invalid
+    valid_vectors = [
+        v for v in all_feature_vectors
+        if isinstance(v, np.ndarray) and v.shape == (6,) and not np.isnan(v).any()
+    ]
+
+    fvectors = np.array(valid_vectors)
+
+    print(f"Collected {len(fvectors)} valid feature vectors out of {len(all_feature_vectors)}")
+
+    # Then you can continue with PCA and clustering on fvectors
+    reduced_fvectors = pca_reduce(fvectors, n_components=2)
+    assignments, centroids = k_means_cluster(
+        number_of_clusters=2,
+        max_iterations=100,
+        reduced_fvectors=reduced_fvectors
+    )
+
+    plt.scatter(reduced_fvectors[:, 0], reduced_fvectors[:, 1], c=assignments)
+    plt.title("Asset Clustering via PCA + K-Means")
+    plt.xlabel("PC1")
+    plt.ylabel("PC2")
+    plt.show()
 
 
 
