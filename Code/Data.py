@@ -257,12 +257,15 @@ def pca_reduce(fvectors: np.ndarray, n_components: int = 10):
 
     eig_val, eig_vec = eigh(cov_matrix)
     # Sort by descending eigenvalues
-    eig_vec = eig_vec[:, np.argsort(eig_val)[::-1]] 
+    sorted_indices = np.argsort(eig_val)[::-1]
+    eig_val = eig_val[sorted_indices]
+    eig_vec = eig_vec[:, sorted_indices]
 
     # Project to reduced dimensions
     reduced_fvectors = np.dot(normalized_fvectors, eig_vec[:, :n_components])
 
-    return reduced_fvectors
+    # Return both reduced vectors and loadings (components)
+    return reduced_fvectors, eig_vec[:, :n_components]
 
 def k_means_cluster(number_of_clusters: int, max_iterations: int, reduced_fvectors: np.ndarray, tolerance=1e-4):
     """
@@ -347,19 +350,33 @@ if __name__ == '__main__':
     print(f"Collected {len(fvectors)} valid feature vectors out of {len(all_feature_vectors)}")
 
     # Then you can continue with PCA and clustering on fvectors
-    reduced_fvectors = pca_reduce(fvectors, n_components=2)
+    reduced_fvectors, loadings = pca_reduce(fvectors, n_components=2)
     assignments, centroids = k_means_cluster(
-        number_of_clusters=2,
+        number_of_clusters=4,
         max_iterations=100,
         reduced_fvectors=reduced_fvectors
     )
+
+    reduced_fvectors, loadings = pca_reduce(fvectors, n_components=2)
+
+    feature_names = [
+        "half_life",
+        "volatility_returns_mean",
+        "adftest",
+        "arch_p_test",
+        "average_hourly_volume",
+        "volume_volatility_mean"
+    ]
+
+    print("PCA Loadings (feature weights per principal component):")
+    for i in range(loadings.shape[1]):
+        print(f"\nPrincipal Component {i+1}:")
+        for feature_name, loading in zip(feature_names, loadings[:, i]):
+            print(f"  {feature_name}: {loading:.4f}")
 
     plt.scatter(reduced_fvectors[:, 0], reduced_fvectors[:, 1], c=assignments)
     plt.title("Asset Clustering via PCA + K-Means")
     plt.xlabel("PC1")
     plt.ylabel("PC2")
     plt.show()
-
-
-
 
