@@ -13,14 +13,10 @@ Purpose: Core strategy logic for signals, position sizing, and execution logic.
     This is the main file we will run the singals with.
     
 """
-import Data
 import Features
 import numpy as np
 import pandas as pd
 import ccxt
-import time
-import math
-import requests
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
@@ -100,3 +96,4 @@ if __name__ == '__main__':
 
     cluster = Features.clusters(assignments,top_100_symbols)
     print(cluster)
+    Features.BTC_Cluster(cluster)

@@ -284,4 +284,11 @@ def clusters(assignments,symbols):
         clusters[cluster_num].append(symbols[i])
     return clusters
 
+def BTC_Cluster(clusters_dict):
+    for cluster_id, assets in clusters_dict.items():
+        if 'BTC/USDT' in assets:
+            print(f"'BTC/USDT' is in cluster {cluster_id}")
+            return cluster_id
+    print("BTC/USDT not found in any cluster")
+    return [] 
         

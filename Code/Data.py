@@ -17,10 +17,7 @@ import time
 import math
 import requests
 import matplotlib.pyplot as plt
-from scipy.linalg import eigh
-from scipy.spatial.distance import cdist
-from statsmodels.tsa.stattools import adfuller
-from arch import arch_model
+
 
 class CryptoData: 
     """
