@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # Reduces and clusters.
     reduced_fvectors, loadings = Features.pca_reduce(fvectors, n_components=2)
     assignments, centroids = Features.k_means_cluster(
-        number_of_clusters=4,
+        number_of_clusters=6,
         max_iterations=100,
         reduced_fvectors=reduced_fvectors
     )

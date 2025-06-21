@@ -285,4 +285,3 @@ def clusters(assignments,symbols):
     return clusters
 
         
-
