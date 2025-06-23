@@ -264,7 +264,19 @@ def k_means_cluster(number_of_clusters: int, max_iterations: int, reduced_fvecto
         # Updates centroids.
         centroids = new_centroids
 
-    return assignments, centroids
+    return assignments, centroids, distances
+
+def calc_WCSS(distances, assignments):
+    # Get the distance from each point to its assigned centroid
+    assigned_distances = distances[np.arange(len(assignments)), assignments]
+
+    # Square the distances
+    squared_distances = assigned_distances ** 2
+
+    # Sum them all for total WCSS
+    wcss = np.sum(squared_distances)
+
+    return wcss
 
 def clusters(assignments,symbols):
     """
