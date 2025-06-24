@@ -296,11 +296,11 @@ def clusters(assignments,symbols):
         clusters[cluster_num].append(symbols[i])
     return clusters
 
-def BTC_Cluster(clusters_dict):
-    for cluster_id, assets in clusters_dict.items():
-        if 'BTC/USDT' in assets:
-            print(f"'BTC/USDT' is in cluster {cluster_id}")
-            return cluster_id
-    print("BTC/USDT not found in any cluster")
-    return [] 
-        
+def Biggest_Cluster(clusters_dict):
+    if not clusters_dict:
+        print("No clusters found.")
+        return None
+    biggest_cluster_id = max(clusters_dict, key=lambda k: len(clusters_dict[k]))
+    print(f"Cluster {biggest_cluster_id} has the most coins ({len(clusters_dict[biggest_cluster_id])})")
+    return biggest_cluster_id
+            

@@ -13,7 +13,7 @@ Purpose: Core strategy logic for signals, position sizing, and execution logic.
     This is the main file we will run the singals with.
     
 """
-import Code.Features_Cluster as Features_Cluster
+import Features_Cluster as FeaturesCluster
 import numpy as np
 import pandas as pd
 import ccxt
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     all_feature_vectors = []
     # Construct a feature vector for each symbol.
     for symbol in top_100_symbols:
-        crypto = Features_Cluster.FeatureExtractor(symbol, exchange)
+        crypto = FeaturesCluster.FeatureExtractor(symbol, exchange)
         crypto.fetchdata()
         features = crypto.feature_vector_builder()
         all_feature_vectors.append(features)
@@ -60,18 +60,18 @@ if __name__ == '__main__':
     print(f"Collected {len(fvectors)} valid feature vectors out of {len(all_feature_vectors)}")
 
     # Reduces and clusters.
-    reduced_fvectors, loadings = Features_Cluster.pca_reduce(fvectors, n_components=2)
+    reduced_fvectors, loadings = FeaturesCluster.pca_reduce(fvectors, n_components=2)
 
     wcss_values = np.empty(9)
 
     for i, k in enumerate(range (2,11)):
-        assignments, centroids, distances = Features_Cluster.k_means_cluster(
+        assignments, centroids, distances = FeaturesCluster.k_means_cluster(
             number_of_clusters=k,
             max_iterations=100,
             reduced_fvectors=reduced_fvectors
         )
 
-        wcss_values[i] = Features_Cluster.calc_WCSS(distances, assignments)
+        wcss_values[i] = FeaturesCluster.calc_WCSS(distances, assignments)
 
     feature_names = [
         "half_life",
@@ -100,6 +100,6 @@ if __name__ == '__main__':
     plt.title("Asset Clustering via PCA + K-Means")
     plt.show()
 
-    cluster = Features_Cluster.clusters(assignments,top_100_symbols)
+    cluster = FeaturesCluster.clusters(assignments,top_100_symbols)
     print(cluster)
-    Features_Cluster.BTC_Cluster(cluster)
+    FeaturesCluster.Biggest_Cluster(cluster)
