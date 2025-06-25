@@ -63,19 +63,6 @@ class CryptoData:
             df.set_index('timestamp', inplace=True)
             self.df = df
 
-            # Here we are getting the funding rate from the binance api
-            symbol_for_api = self.symbol.replace('/', '')
-            url = f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol_for_api}&limit=1000"
-            resp = requests.get(url)
-            data = resp.json()
-            df_funding = pd.DataFrame(data)
-            df_funding['fundingTime'] = pd.to_datetime(df_funding['fundingTime'], unit='ms')
-            df_funding.set_index('fundingTime', inplace=True)
-            df_funding['fundingRate'] = df_funding['fundingRate'].astype(float)
-
-            # Forward fill funding rates on your OHLCV timestamps
-            self.df['fundingRate'] = df_funding['fundingRate'].reindex(self.df.index, method='ffill')
-
         except Exception as e:
             print(f"Failed to fetch {self.symbol}: {e}")
             self.df = None
