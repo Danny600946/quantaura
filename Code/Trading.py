@@ -14,6 +14,7 @@ Purpose: Core strategy logic for signals, position sizing, and execution logic.
     
 """
 import Features_Cluster as FeaturesCluster
+import Features_Model as FeaturesModel
 import numpy as np
 import pandas as pd
 import ccxt
@@ -102,4 +103,8 @@ if __name__ == '__main__':
 
     cluster = FeaturesCluster.clusters(assignments,top_100_symbols)
     print(cluster)
-    FeaturesCluster.Biggest_Cluster(cluster)
+    Cluster_Symbols = cluster
+    Biggest_Cluster_ID = FeaturesCluster.Biggest_Cluster(Cluster_Symbols)
+    FeaturesCluster.Cluster_Symbols = Cluster_Symbols
+    FeaturesCluster.Biggest_Cluster_ID = Biggest_Cluster_ID
+    FeaturesModel.compute_log_spreads(exchange)
