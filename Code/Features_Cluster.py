@@ -21,8 +21,10 @@ import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
 from statsmodels.tsa.stattools import adfuller
-from arch import arch_model
+from arch import arch_model 
 
+Cluster_Symbols = None  
+Biggest_Cluster_ID = None  
 #makes the features a child class of CryptoData
 class FeatureExtractor(CryptoData):
         

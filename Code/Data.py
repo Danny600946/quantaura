@@ -62,7 +62,7 @@ class CryptoData:
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
             df.set_index('timestamp', inplace=True)
             self.df = df
-
+            
         except Exception as e:
             print(f"Failed to fetch {self.symbol}: {e}")
             self.df = None
