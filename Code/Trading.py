@@ -20,6 +20,7 @@ import pandas as pd
 import ccxt
 import seaborn as sns
 import matplotlib.pyplot as plt
+from Features_Model import Calculations_Model
 from scipy.linalg import eigh
 from scipy.spatial.distance import cdist
 from statsmodels.tsa.stattools import adfuller
@@ -107,4 +108,7 @@ if __name__ == '__main__':
     Biggest_Cluster_ID = FeaturesCluster.Biggest_Cluster(Cluster_Symbols)
     FeaturesCluster.Cluster_Symbols = Cluster_Symbols
     FeaturesCluster.Biggest_Cluster_ID = Biggest_Cluster_ID
-    FeaturesModel.compute_log_spreads(exchange)
+    calc_model = Calculations_Model(exchange)
+    spreads = calc_model.compute_log_spreads()
+    Main_pairs = calc_model.filtering_pairs(spreads)
+    print(Main_pairs)
